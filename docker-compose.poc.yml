@@ -1,0 +1,136 @@
+# ============================================================
+# POC Override — docker-compose.poc.yml
+#
+# Extends the base docker-compose.yml for local POC use:
+#   • Swaps BigQuery → SQLite for catalog-service & audit-service
+#   • Adds SQLite connector support in connector-service
+#   • Disables live DataHub calls in lineage-service
+#   • Mounts ./poc/data as /poc-data in relevant services
+#   • Adds poc-postgres: a real PostgreSQL instance on port 5433
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.poc.yml up -d
+#   python poc/seed_postgres.py           # seed the Postgres database
+#   docker compose -f docker-compose.yml -f docker-compose.poc.yml down
+# ============================================================
+
+version: "3.9"
+
+services:
+
+  # ── connector-service: mount the SQLite source database ─────────────────
+  connector-service:
+    volumes:
+      - ./poc/data:/poc-data
+    environment:
+      # All other env vars inherited from base compose
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:8006
+      - CATALOG_SERVICE_URL=http://catalog-service:8005
+      - CLASSIFICATION_SERVICE_URL=http://classification-service:8003
+      - TERM_SERVICE_URL=http://term-service:8004
+      - OPA_URL=http://opa:8181
+      - GCP_PROJECT=my-data-platform
+      - LOG_LEVEL=DEBUG
+
+  # ── catalog-service: use SQLite instead of BigQuery ──────────────────────
+  catalog-service:
+    volumes:
+      - ./poc/data:/poc-data
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:8006
+      - OPA_URL=http://opa:8181
+      - GCP_PROJECT=my-data-platform
+      - LOG_LEVEL=DEBUG
+      # ← POC switches
+      - CATALOG_BACKEND=sqlite
+      - SQLITE_DB_PATH=/poc-data/catalog.db
+
+  # ── audit-service: use SQLite instead of BigQuery ────────────────────────
+  audit-service:
+    volumes:
+      - ./poc/data:/poc-data
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:8006
+      - OPA_URL=http://opa:8181
+      - GCP_PROJECT=my-data-platform
+      - LOG_LEVEL=DEBUG
+      # ← POC switches
+      - CATALOG_BACKEND=sqlite
+      - SQLITE_DB_PATH=/poc-data/audit.db
+
+  # ── lineage-service: skip live DataHub calls ─────────────────────────────
+  lineage-service:
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:8006
+      - OPA_URL=http://opa:8181
+      - GCP_PROJECT=my-data-platform
+      - DATAHUB_GMS_URL=http://datahub-gms:8080
+      - LOG_LEVEL=DEBUG
+      # ← POC switch
+      - DATAHUB_ENABLED=false
+
+  # ── auth-service: bump log level only ────────────────────────────────────
+  auth-service:
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - OPA_URL=http://opa:8181
+      - JWT_SECRET_KEY=local-dev-secret-replace-in-prod-256bits
+      - JWT_ACCESS_TOKEN_TTL_MINUTES=60
+      - JWT_REFRESH_TOKEN_TTL_DAYS=1
+      - LOG_LEVEL=DEBUG
+
+  # ── poc-postgres: local PostgreSQL source for connector POC ─────────────
+  #
+  # Accessible from:
+  #   • host machine  → localhost:5433  (for seed_postgres.py)
+  #   • Docker network → poc-postgres:5432  (for connector-service)
+  #
+  # Seed after stack is up:
+  #   python poc/seed_postgres.py
+  #
+  # Register in the catalog (from connector-service):
+  #   POST /connector/sources
+  #   { "source_type": "postgresql", "host": "poc-postgres", "port": 5432,
+  #     "database": "catalog_poc", "username": "poc_user",
+  #     "password": "poc_password",
+  #     "schema_filter": ["finance_db", "hr_db", "product_db"] }
+  # ─────────────────────────────────────────────────────────────────────────
+  poc-postgres:
+    image: postgres:16-alpine
+    container_name: poc-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"       # host:5433 → container:5432 (avoids local PG clash)
+    environment:
+      POSTGRES_DB: catalog_poc
+      POSTGRES_USER: poc_user
+      POSTGRES_PASSWORD: poc_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - poc_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poc_user -d catalog_poc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - catalog-net   # same network as connector-service and other catalog services
+
+volumes:
+  poc_postgres_data:
+    driver: local
+
+networks:
+  catalog-net:
+    external: true
+    name: data-catalog-platform_catalog-net

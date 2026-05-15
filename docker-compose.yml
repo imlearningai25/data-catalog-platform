@@ -1,0 +1,443 @@
+# ============================================================
+# Data Catalog Platform — Local Development Stack
+# Starts all microservices + infrastructure in one command:
+#   docker-compose up -d
+#
+# Service ports:
+#   8000  API Gateway
+#   8001  Connector Service
+#   8002  Metadata Service
+#   8003  Classification Service
+#   8004  Term Service
+#   8005  Catalog Service
+#   8006  Auth Service
+#   8007  Audit Service
+#   8008  Lineage Service
+#   8009  React Frontend (Vite dev server)
+#   9090  Prometheus
+#   8010  Grafana
+#   9093  Alertmanager
+#   8181  OPA
+#   9092  Kafka (internal), 9094 Kafka (external listener)
+#   6379  Redis
+#   8080  DataHub GMS
+# ============================================================
+
+version: "3.9"
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - catalog-net
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-fastapi-defaults: &fastapi-defaults
+  <<: *service-defaults
+  environment:
+    - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    - REDIS_URL=redis://redis:6379
+    - AUTH_SERVICE_URL=http://auth-service:8006
+    - CATALOG_SERVICE_URL=http://catalog-service:8005
+    - CLASSIFICATION_SERVICE_URL=http://classification-service:8003
+    - TERM_SERVICE_URL=http://term-service:8004
+    - OPA_URL=http://opa:8181
+    - DATAHUB_GMS_URL=http://datahub-gms:8080
+    - GCP_PROJECT=my-data-platform
+    - BQ_DATASET=data_catalog
+    - LOG_LEVEL=INFO
+  depends_on:
+    kafka:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+# ============================================================
+# NETWORKS
+# ============================================================
+networks:
+  catalog-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ============================================================
+# VOLUMES
+# ============================================================
+volumes:
+  kafka-data:
+  zookeeper-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+  opa-data:
+
+# ============================================================
+# SERVICES
+# ============================================================
+services:
+
+  # ---- Infrastructure ------------------------------------------------
+
+  zookeeper:
+    <<: *service-defaults
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  kafka:
+    <<: *service-defaults
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  kafka-init:
+    <<: *service-defaults
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      "
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw-metadata-events --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic enriched-metadata-events --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic audit-events --partitions 3 --replication-factor 1
+      echo 'Kafka topics created successfully'
+      "
+    restart: "no"
+
+  redis:
+    <<: *service-defaults
+    image: redis:7.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  opa:
+    <<: *service-defaults
+    image: openpolicyagent/opa:0.65.0-debug
+    container_name: opa
+    ports:
+      - "8181:8181"
+    command:
+      - "run"
+      - "--server"
+      - "--log-format=json"
+      - "--log-level=info"
+      - "--addr=0.0.0.0:8181"
+      - "/policies"
+    volumes:
+      - ./services/auth-service/policies:/policies:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Microservices -------------------------------------------------
+
+  connector-service:
+    <<: *fastapi-defaults
+    build:
+      context: ./services/connector-service
+      dockerfile: Dockerfile
+    container_name: connector-service
+    ports:
+      - "8001:8001"
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --workers 2 --log-level info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  metadata-service:
+    <<: *fastapi-defaults
+    build:
+      context: ./services/metadata-service
+      dockerfile: Dockerfile
+    container_name: metadata-service
+    ports:
+      - "8002:8002"
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --workers 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  classification-service:
+    <<: *fastapi-defaults
+    build:
+      context: ./services/classification-service
+      dockerfile: Dockerfile
+    container_name: classification-service
+    ports:
+      - "8003:8003"
+    command: uvicorn main:app --host 0.0.0.0 --port 8003 --workers 4
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  term-service:
+    <<: *fastapi-defaults
+    build:
+      context: ./services/term-service
+      dockerfile: Dockerfile
+    container_name: term-service
+    ports:
+      - "8004:8004"
+    command: uvicorn main:app --host 0.0.0.0 --port 8004 --workers 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  catalog-service:
+    <<: *fastapi-defaults
+    build:
+      context: ./services/catalog-service
+      dockerfile: Dockerfile
+    container_name: catalog-service
+    ports:
+      - "8005:8005"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:8006
+      - OPA_URL=http://opa:8181
+      - GCP_PROJECT=my-data-platform
+      - LOG_LEVEL=INFO
+      - CATALOG_BACKEND=sqlite
+      - SQLITE_DB_PATH=/poc-data/catalog.db
+    volumes:
+      - ./poc/data:/poc-data
+    command: uvicorn main:app --host 0.0.0.0 --port 8005 --workers 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    <<: *fastapi-defaults
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8006:8006"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - OPA_URL=http://opa:8181
+      - JWT_SECRET_KEY=local-dev-secret-replace-in-prod-256bits
+      - JWT_ACCESS_TOKEN_TTL_MINUTES=15
+      - JWT_REFRESH_TOKEN_TTL_DAYS=1
+      - LOG_LEVEL=INFO
+    command: uvicorn main:app --host 0.0.0.0 --port 8006 --workers 2
+    depends_on:
+      opa:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  audit-service:
+    <<: *fastapi-defaults
+    build:
+      context: ./services/audit-service
+      dockerfile: Dockerfile
+    container_name: audit-service
+    ports:
+      - "8007:8007"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth-service:8006
+      - OPA_URL=http://opa:8181
+      - LOG_LEVEL=INFO
+      - CATALOG_BACKEND=sqlite
+      - SQLITE_DB_PATH=/poc-data/audit.db
+    volumes:
+      - ./poc/data:/poc-data
+    command: uvicorn main:app --host 0.0.0.0 --port 8007 --workers 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  lineage-service:
+    <<: *fastapi-defaults
+    build:
+      context: ./services/lineage-service
+      dockerfile: Dockerfile
+    container_name: lineage-service
+    ports:
+      - "8008:8008"
+    command: uvicorn main:app --host 0.0.0.0 --port 8008 --workers 2
+    environment:
+      - DATAHUB_ENABLED=false
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ---- API Gateway ---------------------------------------------------
+
+  api-gateway:
+    <<: *service-defaults
+    image: nginx:1.27-alpine
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./services/api-gateway/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
+    depends_on:
+      - auth-service
+      - catalog-service
+      - connector-service
+      - metadata-service
+      - classification-service
+      - term-service
+      - lineage-service
+      - audit-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ---- Frontend ------------------------------------------------------
+
+  frontend:
+    <<: *service-defaults
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: frontend
+    ports:
+      - "8009:8009"
+    environment:
+      - VITE_API_GATEWAY_URL=http://localhost:8000
+    volumes:
+      - ./frontend/src:/app/src:ro
+    depends_on:
+      - api-gateway
+
+  # ---- Monitoring ----------------------------------------------------
+
+  prometheus:
+    <<: *service-defaults
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    <<: *service-defaults
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    ports:
+      - "8010:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ALERTING_ENABLED=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/grafana/provisioning/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  alertmanager:
+    <<: *service-defaults
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"

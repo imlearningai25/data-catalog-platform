@@ -1,0 +1,85 @@
+# ============================================================
+# Istio mTLS — Zero Trust service mesh
+# Enforces mutual TLS for ALL inter-service communication
+# ============================================================
+
+# Strict mTLS for the entire data-catalog namespace
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default-mtls
+  namespace: data-catalog
+spec:
+  mtls:
+    mode: STRICT         # Reject any non-mTLS traffic
+---
+# Authorization policies — only allow defined service-to-service flows
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-api-gateway-to-services
+  namespace: data-catalog
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/data-catalog/sa/data-catalog-sa
+      to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+---
+# Frontend can only talk to API gateway
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: frontend-to-gateway-only
+  namespace: data-catalog
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["data-catalog", "ingress-nginx"]
+---
+# Auth service: only API gateway can call it
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: protect-auth-service
+  namespace: data-catalog
+spec:
+  selector:
+    matchLabels:
+      app: auth-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/data-catalog/sa/data-catalog-sa"
+---
+# Audit service: all services can write, only admin can read
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: audit-service-write-only
+  namespace: data-catalog
+spec:
+  selector:
+    matchLabels:
+      app: audit-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/data-catalog/sa/data-catalog-sa"
+      to:
+        - operation:
+            methods: ["POST"]
+            paths: ["/audit/events"]

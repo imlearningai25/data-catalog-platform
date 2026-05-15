@@ -1,0 +1,127 @@
+# ============================================================
+# All remaining microservices — following the same pattern
+# as connector-service.yaml with appropriate resource limits.
+# ============================================================
+
+{% for svc in [
+  { name: "metadata-service",       port: 8002, cpu_req: "200m", mem_req: "512Mi", cpu_lim: "800m",  mem_lim: "1.5Gi", min: 2, max: 8  },
+  { name: "classification-service", port: 8003, cpu_req: "200m", mem_req: "256Mi", cpu_lim: "500m",  mem_lim: "512Mi", min: 2, max: 12 },
+  { name: "term-service",           port: 8004, cpu_req: "100m", mem_req: "256Mi", cpu_lim: "500m",  mem_lim: "512Mi", min: 1, max: 4  },
+  { name: "catalog-service",        port: 8005, cpu_req: "250m", mem_req: "512Mi", cpu_lim: "1000m", mem_lim: "2Gi",  min: 2, max: 10 },
+  { name: "auth-service",           port: 8006, cpu_req: "200m", mem_req: "256Mi", cpu_lim: "800m",  mem_lim: "1Gi",  min: 3, max: 15 },
+  { name: "audit-service",          port: 8007, cpu_req: "100m", mem_req: "256Mi", cpu_lim: "500m",  mem_lim: "512Mi", min: 1, max: 5 },
+  { name: "lineage-service",        port: 8008, cpu_req: "200m", mem_req: "256Mi", cpu_lim: "500m",  mem_lim: "512Mi", min: 1, max: 4  },
+] %}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ svc.name }}
+  namespace: data-catalog
+  labels:
+    app: {{ svc.name }}
+    app.kubernetes.io/part-of: data-catalog
+spec:
+  replicas: {{ svc.min }}
+  selector:
+    matchLabels:
+      app: {{ svc.name }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: {{ svc.name }}
+        app.kubernetes.io/part-of: data-catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ svc.port }}"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-catalog-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: {{ svc.name }}
+          image: us-central1-docker.pkg.dev/my-data-platform/data-catalog/{{ svc.name }}:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ svc.port }}
+          envFrom:
+            - configMapRef:
+                name: data-catalog-config
+            - secretRef:
+                name: data-catalog-secrets
+          resources:
+            requests:
+              cpu: {{ svc.cpu_req }}
+              memory: {{ svc.mem_req }}
+            limits:
+              cpu: {{ svc.cpu_lim }}
+              memory: {{ svc.mem_lim }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ svc.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ svc.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ svc.name }}
+  namespace: data-catalog
+spec:
+  selector:
+    app: {{ svc.name }}
+  ports:
+    - port: {{ svc.port }}
+      targetPort: {{ svc.port }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ svc.name }}-hpa
+  namespace: data-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ svc.name }}
+  minReplicas: {{ svc.min }}
+  maxReplicas: {{ svc.max }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+{% endfor %}

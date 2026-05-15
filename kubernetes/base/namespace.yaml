@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data-catalog
+  labels:
+    name: data-catalog
+    istio-injection: enabled          # Enable Istio sidecar injection for mTLS
+    environment: production
+---
+# Network policy: Zero Trust — deny all by default, allow only explicit rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: data-catalog
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  # Egress only to DNS, Kafka, BigQuery, Redis — rest is blocked
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53    # DNS
+---
+# Allow inter-service traffic via explicit service labels
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-services
+  namespace: data-catalog
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: data-catalog
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: data-catalog
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: data-catalog
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: data-catalog
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+    - ports:
+        - port: 9092    # Kafka
+        - port: 6379    # Redis
+        - port: 443     # BigQuery (HTTPS)
+        - port: 53
+          protocol: UDP

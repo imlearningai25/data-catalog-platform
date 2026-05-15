@@ -1,0 +1,152 @@
+---
+# ============================================================
+# Connector Service — Kubernetes Deployment
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connector-service
+  namespace: data-catalog
+  labels:
+    app: connector-service
+    app.kubernetes.io/name: connector-service
+    app.kubernetes.io/part-of: data-catalog
+    version: "1.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: connector-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0              # Zero-downtime deployments
+  template:
+    metadata:
+      labels:
+        app: connector-service
+        app.kubernetes.io/part-of: data-catalog
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-catalog-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: connector-service
+          image: us-central1-docker.pkg.dev/my-data-platform/data-catalog/connector-service:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8001
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: data-catalog-config
+                  key: kafka_bootstrap_servers
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service:8006"
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: data-catalog-config
+                  key: redis_url
+          envFrom:
+            - secretRef:
+                name: data-catalog-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: connector-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: connector-service
+  namespace: data-catalog
+  labels:
+    app: connector-service
+spec:
+  selector:
+    app: connector-service
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+---
+# Horizontal Pod Autoscaler — scale 2→10 pods based on CPU/memory
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: connector-service-hpa
+  namespace: data-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: connector-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300     # 5-min cooldown before scale-down

@@ -1,0 +1,182 @@
+# ============================================================
+# Service-Level Alerting Rules
+# Per-service health and performance monitoring
+# ============================================================
+
+groups:
+
+  # ---- Connector Service ----
+  - name: connector_service
+    rules:
+      - alert: HydrationJobStuck
+        expr: |
+          (time() - connector_run_duration_seconds_created{source_type=~".+"}) > 3600
+        for: 5m
+        labels:
+          severity: warning
+          service: connector-service
+        annotations:
+          summary: "Hydration job running > 1 hour for {{ $labels.source_type }}"
+          description: "A connector hydration job has been running for over 60 minutes. Check for deadlocks."
+
+      - alert: NoHydrationJobsCompleted
+        expr: |
+          increase(connector_runs_total{status="success"}[6h]) == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: connector-service
+        annotations:
+          summary: "No successful hydration jobs in the last 6 hours"
+
+      - alert: HydrationFailureRateHigh
+        expr: |
+          rate(connector_runs_total{status="failure"}[15m])
+          /
+          rate(connector_runs_total[15m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: connector-service
+        annotations:
+          summary: "Connector failure rate > 20%"
+          description: "Source: {{ $labels.source_type }}. Failure rate: {{ $value | humanizePercentage }}"
+
+  # ---- Metadata / Enrichment Service ----
+  - name: metadata_service
+    rules:
+      - alert: MetadataEnrichmentLag
+        expr: |
+          kafka_consumer_group_lag{group="metadata-enrichment-group"} > 5000
+        for: 10m
+        labels:
+          severity: warning
+          service: metadata-service
+        annotations:
+          summary: "Metadata enrichment Kafka consumer lag > 5000"
+          description: "Current lag: {{ $value }}. The metadata service may be under-provisioned."
+
+      - alert: EnrichmentProcessingSlowdown
+        expr: |
+          histogram_quantile(0.95, rate(metadata_enrichment_duration_seconds_bucket[5m])) > 30
+        for: 10m
+        labels:
+          severity: warning
+          service: metadata-service
+        annotations:
+          summary: "Metadata enrichment p95 latency > 30s"
+
+  # ---- Catalog Service ----
+  - name: catalog_service
+    rules:
+      - alert: CatalogSearchSlow
+        expr: |
+          histogram_quantile(0.99, rate(catalog_search_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: catalog-service
+        annotations:
+          summary: "Catalog search p99 > 5s — BigQuery query performance degraded"
+
+      - alert: CatalogIngestLag
+        expr: |
+          kafka_consumer_group_lag{group="catalog-ingest-group"} > 10000
+        for: 10m
+        labels:
+          severity: warning
+          service: catalog-service
+        annotations:
+          summary: "Catalog ingest Kafka lag > 10,000"
+
+  # ---- Auth Service ----
+  - name: auth_service
+    rules:
+      - alert: AuthServiceHighLoad
+        expr: |
+          rate(auth_attempts_total[1m]) > 500
+        for: 2m
+        labels:
+          severity: warning
+          service: auth-service
+        annotations:
+          summary: "Auth service processing > 500 logins/sec — possible DDoS or load spike"
+
+      - alert: TokenValidationFailureSpike
+        expr: |
+          rate(token_validations_total{outcome="invalid"}[5m]) > 20
+        for: 2m
+        labels:
+          severity: critical
+          service: auth-service
+          pagerduty: "true"
+        annotations:
+          summary: "Spike in invalid JWT token attempts — possible token forgery attack"
+
+  # ---- Lineage Service ----
+  - name: lineage_service
+    rules:
+      - alert: DataHubEmitFailures
+        expr: |
+          rate(lineage_events_total{status="failure"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: lineage-service
+        annotations:
+          summary: "DataHub lineage emit failures detected"
+          description: "Lineage data may be incomplete. Check DataHub GMS connectivity."
+
+  # ---- Audit Service ----
+  - name: audit_service
+    rules:
+      - alert: AuditWriteFailures
+        expr: |
+          rate(audit_events_written_total{outcome="FAILURE"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: audit-service
+          pagerduty: "true"
+        annotations:
+          summary: "Audit log write failures — COMPLIANCE RISK"
+          description: "Audit events are failing to write to BigQuery. Compliance trail is incomplete."
+
+  # ---- Kafka ----
+  - name: kafka_health
+    rules:
+      - alert: KafkaBrokerDown
+        expr: up{job="kafka"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          pagerduty: "true"
+        annotations:
+          summary: "Kafka broker is DOWN — pipeline ingestion stopped"
+
+      - alert: KafkaPartitionUnderReplicated
+        expr: kafka_topic_partition_under_replicated_partition > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka has under-replicated partitions"
+
+  # ---- Redis ----
+  - name: redis_health
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is DOWN — token cache unavailable"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage > 90%"

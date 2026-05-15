@@ -1,0 +1,135 @@
+# ============================================================
+# SLA Alerting Rules — 99.99% Uptime
+# 99.99% = max 52.6 minutes of downtime per year
+# = max 4.38 minutes per month
+# = max 1.01 minutes per week
+# ============================================================
+
+groups:
+  - name: sla_uptime
+    interval: 30s
+    rules:
+
+      # ---- Availability SLO ----
+      # Measure: 5xx error rate over 5-minute windows
+      - record: job:http_error_rate:ratio5m
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (job)
+          /
+          sum(rate(http_requests_total[5m])) by (job)
+
+      # Alert when service error rate > 0.1% (breaches 99.9% SLO)
+      - alert: HighErrorRate
+        expr: job:http_error_rate:ratio5m > 0.001
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+          runbook: "https://wiki.internal/runbooks/high-error-rate"
+
+      # Alert when error rate > 1% (breaches 99% SLO — page immediately)
+      - alert: CriticalErrorRate
+        expr: job:http_error_rate:ratio5m > 0.01
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          pagerduty: "true"
+        annotations:
+          summary: "CRITICAL: Service {{ $labels.job }} error rate > 1%"
+          description: "{{ $labels.job }} error rate: {{ $value | humanizePercentage }}. SLA at risk."
+
+      # ---- Latency SLO (p99 < 2s) ----
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High p99 latency on {{ $labels.job }}"
+          description: "p99 latency is {{ $value }}s (threshold: 2s)"
+
+      # ---- Service down ----
+      - alert: ServiceDown
+        expr: up{namespace="data-catalog"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          pagerduty: "true"
+        annotations:
+          summary: "Service {{ $labels.service }} is DOWN"
+          description: "{{ $labels.pod }} in {{ $labels.namespace }} has been down for 1 minute."
+
+      # ---- All replicas down (complete outage) ----
+      - alert: AllReplicasDown
+        expr: |
+          kube_deployment_status_replicas_available{namespace="data-catalog"} == 0
+        for: 30s
+        labels:
+          severity: page
+          pagerduty: "true"
+        annotations:
+          summary: "OUTAGE: All replicas of {{ $labels.deployment }} are down"
+          description: "Zero available replicas for {{ $labels.deployment }}. Platform is degraded."
+
+      # ---- Pod restart storm ----
+      - alert: PodRestartingTooFast
+        expr: |
+          rate(kube_pod_container_status_restarts_total{namespace="data-catalog"}[15m]) * 60 > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.pod }} restarting too frequently"
+
+      # ---- HPA at max replicas ----
+      - alert: HPAAtMaxReplicas
+        expr: |
+          kube_horizontalpodautoscaler_status_current_replicas
+          ==
+          kube_horizontalpodautoscaler_spec_max_replicas
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HPA {{ $labels.horizontalpodautoscaler }} is at max replicas"
+          description: "Consider increasing maxReplicas or optimizing the service."
+
+  - name: error_budget
+    rules:
+      # 99.99% SLO — burn rate alerts (Google SRE model)
+      # Fast burn (1-hour window): burns 5% of monthly budget in 1 hour
+      - alert: ErrorBudgetBurnRateFast
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5..", namespace="data-catalog"}[1h]))
+            /
+            sum(rate(http_requests_total{namespace="data-catalog"}[1h]))
+          ) > (14.4 * 0.0001)    # 14.4x burn rate for 1h window at 99.99% SLO
+        for: 2m
+        labels:
+          severity: critical
+          pagerduty: "true"
+        annotations:
+          summary: "ERROR BUDGET FAST BURN — SLA at risk in <2 hours"
+
+      # Slow burn (6-hour window): burns 5% of monthly budget in 6 hours
+      - alert: ErrorBudgetBurnRateSlow
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5..", namespace="data-catalog"}[6h]))
+            /
+            sum(rate(http_requests_total{namespace="data-catalog"}[6h]))
+          ) > (6 * 0.0001)       # 6x burn rate for 6h window
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ERROR BUDGET SLOW BURN — investigate and remediate"

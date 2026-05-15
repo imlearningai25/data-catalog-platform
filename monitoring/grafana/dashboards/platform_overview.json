@@ -1,0 +1,233 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "Data Catalog Platform — 99.99% SLA Dashboard",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "SLA & Error Budget",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",   "value": null },
+              { "color": "orange","value": 99.9 },
+              { "color": "green", "value": 99.99 }
+            ]
+          },
+          "unit": "percent",
+          "min": 99,
+          "max": 100
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 2,
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "expr": "(1 - sum(rate(http_requests_total{status=~\"5..\",namespace=\"data-catalog\"}[30d])) / sum(rate(http_requests_total{namespace=\"data-catalog\"}[30d]))) * 100",
+          "legendFormat": "SLA (30d)"
+        }
+      ],
+      "title": "30-Day SLA",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "id": 3,
+      "options": { "tooltip": { "mode": "single" } },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{namespace=\"data-catalog\"}[1m])) by (service)",
+          "legendFormat": "{{ service }}"
+        }
+      ],
+      "title": "Request Rate by Service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.5 },
+              { "color": "red", "value": 2 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace=\"data-catalog\"}[5m])) by (le, service))",
+          "legendFormat": "p99 {{ service }}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"data-catalog\"}[5m])) by (le, service))",
+          "legendFormat": "p95 {{ service }}"
+        }
+      ],
+      "title": "Latency Percentiles",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "id": 10,
+      "title": "Catalog Operations",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 14 },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "sum(increase(catalog_assets_ingested_total[24h])) by (source_type)",
+          "legendFormat": "{{ source_type }}"
+        }
+      ],
+      "title": "Assets Ingested (24h) by Source",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 14 },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "sum(rate(catalog_search_requests_total[5m])) by (status)",
+          "legendFormat": "{{ status }}"
+        }
+      ],
+      "title": "Search Requests/sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" } } },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 14 },
+      "id": 13,
+      "targets": [
+        {
+          "expr": "sum(rate(classifications_total[5m])) by (result)",
+          "legendFormat": "{{ result }}"
+        }
+      ],
+      "title": "Classification Rate by Result",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
+      "id": 20,
+      "title": "Security & Auth",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 21 },
+      "id": 21,
+      "targets": [
+        {
+          "expr": "sum(rate(auth_attempts_total[5m])) by (outcome)",
+          "legendFormat": "{{ outcome }}"
+        }
+      ],
+      "title": "Auth Attempts by Outcome",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 21 },
+      "id": 22,
+      "targets": [
+        {
+          "expr": "sum(rate(authz_decisions_total[5m])) by (decision, role)",
+          "legendFormat": "{{ decision }} [{{ role }}]"
+        }
+      ],
+      "title": "RBAC Decisions by Role",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 21 },
+      "id": 23,
+      "targets": [
+        {
+          "expr": "sum(rate(audit_events_written_total[5m])) by (event_type)",
+          "legendFormat": "{{ event_type }}"
+        }
+      ],
+      "title": "Audit Events Written/sec",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["data-catalog", "sla", "platform"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(up{namespace=\"data-catalog\"}, service)",
+        "name": "service",
+        "options": [],
+        "query": "label_values(up{namespace=\"data-catalog\"}, service)",
+        "type": "query",
+        "multi": true,
+        "includeAll": true
+      }
+    ]
+  },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Data Catalog Platform — SLA Dashboard",
+  "uid": "data-catalog-sla",
+  "version": 1
+}

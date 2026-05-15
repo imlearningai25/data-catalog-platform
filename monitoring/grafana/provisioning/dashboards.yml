@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: 'data-catalog-dashboards'
+    orgId: 1
+    folder: 'Data Catalog'
+    folderUid: 'data-catalog'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

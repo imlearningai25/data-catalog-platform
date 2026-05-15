@@ -1,0 +1,64 @@
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  scrape_timeout:      10s
+  external_labels:
+    environment: 'docker-compose-poc'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+      timeout: 10s
+
+rule_files:
+  - "rules/sla_rules.yml"
+  - "rules/service_rules.yml"
+  - "rules/security_rules.yml"
+
+scrape_configs:
+
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8006']
+    metrics_path: /metrics
+
+  - job_name: 'catalog-service'
+    static_configs:
+      - targets: ['catalog-service:8005']
+    metrics_path: /metrics
+
+  - job_name: 'connector-service'
+    static_configs:
+      - targets: ['connector-service:8001']
+    metrics_path: /metrics
+
+  - job_name: 'metadata-service'
+    static_configs:
+      - targets: ['metadata-service:8002']
+    metrics_path: /metrics
+
+  - job_name: 'classification-service'
+    static_configs:
+      - targets: ['classification-service:8003']
+    metrics_path: /metrics
+
+  - job_name: 'term-service'
+    static_configs:
+      - targets: ['term-service:8004']
+    metrics_path: /metrics
+
+  - job_name: 'lineage-service'
+    static_configs:
+      - targets: ['lineage-service:8008']
+    metrics_path: /metrics
+
+  - job_name: 'audit-service'
+    static_configs:
+      - targets: ['audit-service:8007']
+    metrics_path: /metrics
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

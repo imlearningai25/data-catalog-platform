@@ -1,0 +1,114 @@
+---
+# ============================================================
+# ConfigMap — Non-sensitive platform configuration
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-catalog-config
+  namespace: data-catalog
+data:
+  kafka_bootstrap_servers: "kafka-broker-0.kafka-headless.data-catalog.svc.cluster.local:9092,kafka-broker-1.kafka-headless.data-catalog.svc.cluster.local:9092"
+  kafka_topic_raw_metadata: "raw-metadata-events"
+  kafka_topic_enriched_metadata: "enriched-metadata-events"
+  redis_url: "redis://redis-master.data-catalog.svc.cluster.local:6379"
+  gcp_project: "my-data-platform"
+  bq_dataset: "data_catalog"
+  auth_service_url: "http://auth-service.data-catalog.svc.cluster.local:8006"
+  catalog_service_url: "http://catalog-service.data-catalog.svc.cluster.local:8005"
+  classification_service_url: "http://classification-service.data-catalog.svc.cluster.local:8003"
+  term_service_url: "http://term-service.data-catalog.svc.cluster.local:8004"
+  opa_url: "http://opa.data-catalog.svc.cluster.local:8181"
+  datahub_gms_url: "http://datahub-gms.data-catalog.svc.cluster.local:8080"
+  log_level: "INFO"
+---
+# ============================================================
+# Secret — Sensitive configuration (use GCP Secret Manager in prod)
+# ============================================================
+# In production, use External Secrets Operator + GCP Secret Manager:
+#   secretStoreRef: kind: ClusterSecretStore name: gcp-secret-store
+apiVersion: v1
+kind: Secret
+metadata:
+  name: data-catalog-secrets
+  namespace: data-catalog
+type: Opaque
+stringData:
+  JWT_SECRET_KEY: "REPLACE_WITH_256BIT_SECRET_FROM_GCP_SECRET_MANAGER"
+  GCP_SERVICE_ACCOUNT_KEY: "REPLACE_WITH_SERVICE_ACCOUNT_JSON_BASE64"
+  DATAHUB_TOKEN: "REPLACE_WITH_DATAHUB_PAT"
+---
+# ============================================================
+# ServiceAccount with Workload Identity for GCP
+# ============================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: data-catalog-sa
+  namespace: data-catalog
+  annotations:
+    iam.gke.io/gcp-service-account: data-catalog-k8s@my-data-platform.iam.gserviceaccount.com
+---
+# ============================================================
+# PodDisruptionBudget — ensure 99.99% uptime during disruptions
+# ============================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: auth-service-pdb
+  namespace: data-catalog
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: auth-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: catalog-service-pdb
+  namespace: data-catalog
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: catalog-service
+---
+# ============================================================
+# Ingress — route external traffic to API Gateway
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: data-catalog-ingress
+  namespace: data-catalog
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  tls:
+    - hosts:
+        - datacatalog.yourdomain.com
+      secretName: datacatalog-tls
+  rules:
+    - host: datacatalog.yourdomain.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

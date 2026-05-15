@@ -1,0 +1,63 @@
+# ============================================================
+# Security Alerting Rules — Zero Trust Monitoring
+# ============================================================
+
+groups:
+  - name: security_alerts
+    rules:
+
+      # Brute force / credential stuffing detection
+      - alert: AuthenticationFailureSpike
+        expr: |
+          rate(auth_attempts_total{outcome="wrong_password"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value }} failed logins per second. Possible brute force attack."
+
+      # Token revocation spike (could indicate account compromise)
+      - alert: HighTokenRevocationRate
+        expr: |
+          rate(auth_attempts_total{outcome="revoked"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          team: security
+
+      # Repeated access denied (possible privilege escalation attempt)
+      - alert: AccessDeniedSpike
+        expr: |
+          rate(authz_decisions_total{decision="deny"}[5m]) > 20
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High rate of RBAC access denials"
+          description: "{{ $value }} denied requests per second. Investigate for privilege escalation."
+
+      # PII access without justification (audit compliance)
+      - alert: UnexpectedPIIAccess
+        expr: |
+          increase(classifications_total{result="PII"}[1h]) > 1000
+        for: 5m
+        labels:
+          severity: info
+          team: compliance
+        annotations:
+          summary: "Unusually high PII data access volume"
+
+      # JWT validation failures (possible token forgery)
+      - alert: JWTValidationFailures
+        expr: |
+          rate(token_validations_total{outcome="invalid"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          team: security
+          pagerduty: "true"
+        annotations:
+          summary: "High JWT validation failure rate — possible token forgery"
