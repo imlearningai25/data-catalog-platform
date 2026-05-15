@@ -307,7 +307,7 @@ jobs:
               run: |
                   kubectl apply -f kubernetes/base/ --namespace=${{ env.NAMESPACE }}
                   kubectl apply -f kubernetes/services/ --namespace=${{ env.NAMESPACE }}
-                  kubectl apply -f kubernetes/security/ --namespace=${{ env.NAMESPACE }}
+                  # kubernetes/security/ skipped — requires Istio CRDs not present on dev cluster
                   kubectl apply -f monitoring/kubernetes/monitoring-stack.yaml
 
             - name: Wait for all deployments to be ready
