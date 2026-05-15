@@ -1,31 +1,22 @@
 # ============================================================
-# All remaining microservices — following the same pattern
-# as connector-service.yaml with appropriate resource limits.
+# All remaining microservices
 # ============================================================
 
-{% for svc in [
-  { name: "metadata-service",       port: 8002, cpu_req: "200m", mem_req: "512Mi", cpu_lim: "800m",  mem_lim: "1.5Gi", min: 2, max: 8  },
-  { name: "classification-service", port: 8003, cpu_req: "200m", mem_req: "256Mi", cpu_lim: "500m",  mem_lim: "512Mi", min: 2, max: 12 },
-  { name: "term-service",           port: 8004, cpu_req: "100m", mem_req: "256Mi", cpu_lim: "500m",  mem_lim: "512Mi", min: 1, max: 4  },
-  { name: "catalog-service",        port: 8005, cpu_req: "250m", mem_req: "512Mi", cpu_lim: "1000m", mem_lim: "2Gi",  min: 2, max: 10 },
-  { name: "auth-service",           port: 8006, cpu_req: "200m", mem_req: "256Mi", cpu_lim: "800m",  mem_lim: "1Gi",  min: 3, max: 15 },
-  { name: "audit-service",          port: 8007, cpu_req: "100m", mem_req: "256Mi", cpu_lim: "500m",  mem_lim: "512Mi", min: 1, max: 5 },
-  { name: "lineage-service",        port: 8008, cpu_req: "200m", mem_req: "256Mi", cpu_lim: "500m",  mem_lim: "512Mi", min: 1, max: 4  },
-] %}
 ---
+# ── metadata-service ────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ svc.name }}
+  name: metadata-service
   namespace: data-catalog
   labels:
-    app: {{ svc.name }}
+    app: metadata-service
     app.kubernetes.io/part-of: data-catalog
 spec:
-  replicas: {{ svc.min }}
+  replicas: 2
   selector:
     matchLabels:
-      app: {{ svc.name }}
+      app: metadata-service
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -34,11 +25,11 @@ spec:
   template:
     metadata:
       labels:
-        app: {{ svc.name }}
+        app: metadata-service
         app.kubernetes.io/part-of: data-catalog
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "{{ svc.port }}"
+        prometheus.io/port: "8002"
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: data-catalog-sa
@@ -46,11 +37,11 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
       containers:
-        - name: {{ svc.name }}
-          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/{{ svc.name }}:1.0.0
+        - name: metadata-service
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/metadata-service:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: {{ svc.port }}
+            - containerPort: 8002
           envFrom:
             - configMapRef:
                 name: data-catalog-config
@@ -58,21 +49,21 @@ spec:
                 name: data-catalog-secrets
           resources:
             requests:
-              cpu: {{ svc.cpu_req }}
-              memory: {{ svc.mem_req }}
+              cpu: 200m
+              memory: 512Mi
             limits:
-              cpu: {{ svc.cpu_lim }}
-              memory: {{ svc.mem_lim }}
+              cpu: 800m
+              memory: 1.5Gi
           livenessProbe:
             httpGet:
               path: /health
-              port: {{ svc.port }}
+              port: 8002
             initialDelaySeconds: 30
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /health
-              port: {{ svc.port }}
+              port: 8002
             initialDelaySeconds: 10
             periodSeconds: 10
           securityContext:
@@ -90,27 +81,27 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ svc.name }}
+  name: metadata-service
   namespace: data-catalog
 spec:
   selector:
-    app: {{ svc.name }}
+    app: metadata-service
   ports:
-    - port: {{ svc.port }}
-      targetPort: {{ svc.port }}
+    - port: 8002
+      targetPort: 8002
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ svc.name }}-hpa
+  name: metadata-service-hpa
   namespace: data-catalog
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ svc.name }}
-  minReplicas: {{ svc.min }}
-  maxReplicas: {{ svc.max }}
+    name: metadata-service
+  minReplicas: 2
+  maxReplicas: 8
   metrics:
     - type: Resource
       resource:
@@ -124,4 +115,687 @@ spec:
         target:
           type: Utilization
           averageUtilization: 75
-{% endfor %}
+
+---
+# ── classification-service ──────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classification-service
+  namespace: data-catalog
+  labels:
+    app: classification-service
+    app.kubernetes.io/part-of: data-catalog
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: classification-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: classification-service
+        app.kubernetes.io/part-of: data-catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8003"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-catalog-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: classification-service
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/classification-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8003
+          envFrom:
+            - configMapRef:
+                name: data-catalog-config
+            - secretRef:
+                name: data-catalog-secrets
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: classification-service
+  namespace: data-catalog
+spec:
+  selector:
+    app: classification-service
+  ports:
+    - port: 8003
+      targetPort: 8003
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: classification-service-hpa
+  namespace: data-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: classification-service
+  minReplicas: 2
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── term-service ────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: term-service
+  namespace: data-catalog
+  labels:
+    app: term-service
+    app.kubernetes.io/part-of: data-catalog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: term-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: term-service
+        app.kubernetes.io/part-of: data-catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8004"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-catalog-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: term-service
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/term-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8004
+          envFrom:
+            - configMapRef:
+                name: data-catalog-config
+            - secretRef:
+                name: data-catalog-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: term-service
+  namespace: data-catalog
+spec:
+  selector:
+    app: term-service
+  ports:
+    - port: 8004
+      targetPort: 8004
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: term-service-hpa
+  namespace: data-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: term-service
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── catalog-service ─────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: data-catalog
+  labels:
+    app: catalog-service
+    app.kubernetes.io/part-of: data-catalog
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: catalog-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+        app.kubernetes.io/part-of: data-catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8005"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-catalog-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: catalog-service
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/catalog-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8005
+          envFrom:
+            - configMapRef:
+                name: data-catalog-config
+            - secretRef:
+                name: data-catalog-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: data-catalog
+spec:
+  selector:
+    app: catalog-service
+  ports:
+    - port: 8005
+      targetPort: 8005
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: catalog-service-hpa
+  namespace: data-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: catalog-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── auth-service ────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: data-catalog
+  labels:
+    app: auth-service
+    app.kubernetes.io/part-of: data-catalog
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: auth-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        app.kubernetes.io/part-of: data-catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8006"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-catalog-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: auth-service
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/auth-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8006
+          envFrom:
+            - configMapRef:
+                name: data-catalog-config
+            - secretRef:
+                name: data-catalog-secrets
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 800m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8006
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8006
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: data-catalog
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 8006
+      targetPort: 8006
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: auth-service-hpa
+  namespace: data-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: auth-service
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── audit-service ───────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-service
+  namespace: data-catalog
+  labels:
+    app: audit-service
+    app.kubernetes.io/part-of: data-catalog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: audit-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: audit-service
+        app.kubernetes.io/part-of: data-catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8007"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-catalog-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: audit-service
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/audit-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8007
+          envFrom:
+            - configMapRef:
+                name: data-catalog-config
+            - secretRef:
+                name: data-catalog-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8007
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8007
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-service
+  namespace: data-catalog
+spec:
+  selector:
+    app: audit-service
+  ports:
+    - port: 8007
+      targetPort: 8007
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: audit-service-hpa
+  namespace: data-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: audit-service
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+
+---
+# ── lineage-service ─────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lineage-service
+  namespace: data-catalog
+  labels:
+    app: lineage-service
+    app.kubernetes.io/part-of: data-catalog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lineage-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: lineage-service
+        app.kubernetes.io/part-of: data-catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8008"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: data-catalog-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: lineage-service
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/lineage-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8008
+          envFrom:
+            - configMapRef:
+                name: data-catalog-config
+            - secretRef:
+                name: data-catalog-secrets
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8008
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8008
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lineage-service
+  namespace: data-catalog
+spec:
+  selector:
+    app: lineage-service
+  ports:
+    - port: 8008
+      targetPort: 8008
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: lineage-service-hpa
+  namespace: data-catalog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: lineage-service
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
