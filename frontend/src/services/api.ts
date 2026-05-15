@@ -6,7 +6,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
 import { Asset, Column, GlossaryTerm, LineageEdge, DataSource, User, AuditEvent } from '../types';
 
-const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8000';
+const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL ?? 'http://localhost:8000';
 
 // Service URLs (routed through API Gateway in production)
 const SERVICES = {

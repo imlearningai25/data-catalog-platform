@@ -75,7 +75,7 @@ spec:
       app: catalog-service
 ---
 # ============================================================
-# Ingress — route external traffic to API Gateway
+# Ingress — route external traffic to API Gateway / Frontend
 # ============================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -83,30 +83,76 @@ metadata:
   name: data-catalog-ingress
   namespace: data-catalog
   annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/rate-limit: "100"
-    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    kubernetes.io/ingress.class: "gce"
 spec:
-  tls:
-    - hosts:
-        - datacatalog.yourdomain.com
-      secretName: datacatalog-tls
   rules:
-    - host: datacatalog.yourdomain.com
-      http:
+    - http:
         paths:
-          - path: /api
-            pathType: Prefix
+          - path: /auth/*
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: api-gateway
                 port:
                   number: 8000
-          - path: /
-            pathType: Prefix
+          - path: /catalog/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /connector/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /metadata/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /classification/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /terms/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /lineage/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /audit/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+          - path: /*
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: frontend

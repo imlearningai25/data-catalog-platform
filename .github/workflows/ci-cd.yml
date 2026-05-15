@@ -215,6 +215,7 @@ jobs:
                     - audit-service
                     - lineage-service
                     - frontend
+                    - api-gateway
 
         permissions:
             contents: read
@@ -248,7 +249,7 @@ jobs:
             - name: Build and push
               uses: docker/build-push-action@v6
               with:
-                  context: ${{ matrix.service == 'frontend' && './frontend' || format('./services/{0}', matrix.service) }}
+                  context: ${{ matrix.service == 'frontend' && './frontend' || matrix.service == 'api-gateway' && './services/api-gateway' || format('./services/{0}', matrix.service) }}
                   push: true
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
@@ -257,7 +258,7 @@ jobs:
                   build-args: |
                       BUILD_DATE=${{ github.event.repository.updated_at }}
                       GIT_COMMIT=${{ github.sha }}
-                      VITE_API_GATEWAY_URL=https://api.datacatalog.io
+                      VITE_API_GATEWAY_URL=http://34.172.177.120
 
             - name: Trivy — image scan
               uses: aquasecurity/trivy-action@master
@@ -323,7 +324,7 @@ jobs:
 
             - name: Smoke tests — verify all pods are Running
               run: |
-                  SERVICES=(connector-service metadata-service classification-service term-service catalog-service auth-service audit-service lineage-service)
+                  SERVICES=(connector-service metadata-service classification-service term-service catalog-service auth-service audit-service lineage-service frontend api-gateway)
                   for svc in "${SERVICES[@]}"; do
                     READY=$(kubectl get deployment/$svc -n ${{ env.NAMESPACE }} -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
                     DESIRED=$(kubectl get deployment/$svc -n ${{ env.NAMESPACE }} -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
