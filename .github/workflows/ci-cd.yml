@@ -262,7 +262,7 @@ jobs:
             - name: Trivy — image scan
               uses: aquasecurity/trivy-action@master
               with:
-                  image-ref: ${{ env.AR_REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+                  image-ref: ${{ env.AR_REGISTRY }}/${{ matrix.service }}:main
                   format: table
                   exit-code: 0
                   severity: CRITICAL
