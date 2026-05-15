@@ -257,6 +257,7 @@ jobs:
                   build-args: |
                       BUILD_DATE=${{ github.event.repository.updated_at }}
                       GIT_COMMIT=${{ github.sha }}
+                      VITE_API_GATEWAY_URL=https://api.datacatalog.io
 
             - name: Trivy — image scan
               uses: aquasecurity/trivy-action@master
