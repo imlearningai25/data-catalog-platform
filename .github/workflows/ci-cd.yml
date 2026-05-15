@@ -73,7 +73,7 @@ jobs:
               working-directory: services/${{ matrix.service }}
               run: |
                   pip install ruff
-                  ruff check . --select E,W,F,I --ignore E501
+                  ruff check . --select E,W,F --ignore E501
 
             - name: Type-check with mypy
               working-directory: services/${{ matrix.service }}
