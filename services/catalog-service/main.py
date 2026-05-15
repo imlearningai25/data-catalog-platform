@@ -23,7 +23,6 @@ from kafka import KafkaConsumer
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-from starlette.requests import Request
 from starlette.responses import Response
 
 log = structlog.get_logger(__name__)

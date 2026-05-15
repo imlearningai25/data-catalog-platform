@@ -19,13 +19,12 @@ from contextlib import asynccontextmanager
 
 import httpx
 import structlog
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, status
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from kafka import KafkaProducer
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from starlette.requests import Request
 from starlette.responses import Response
 
 from connectors.base import (
@@ -406,16 +405,26 @@ async def update_source(source_id: str, req: UpdateSourceRequest):
     if source_id not in registered_sources:
         raise HTTPException(status_code=404, detail=f"Source {source_id} not found")
     s = registered_sources[source_id]
-    if req.host               is not None: s.host               = req.host
-    if req.port               is not None: s.port               = req.port
-    if req.database           is not None: s.database           = req.database
-    if req.username           is not None: s.username           = req.username
-    if req.password:                       s.password           = req.password   # blank = keep existing
-    if req.schema_filter      is not None: s.schema_filter      = req.schema_filter
-    if req.table_filter       is not None: s.table_filter       = req.table_filter
-    if req.enable_profiling   is not None: s.enable_profiling   = req.enable_profiling
-    if req.profile_sample_pct is not None: s.profile_sample_pct = req.profile_sample_pct
-    if req.extra_params       is not None: s.extra_params       = req.extra_params
+    if req.host is not None:
+        s.host = req.host
+    if req.port is not None:
+        s.port = req.port
+    if req.database is not None:
+        s.database = req.database
+    if req.username is not None:
+        s.username = req.username
+    if req.password:
+        s.password = req.password
+    if req.schema_filter is not None:
+        s.schema_filter = req.schema_filter
+    if req.table_filter is not None:
+        s.table_filter = req.table_filter
+    if req.enable_profiling is not None:
+        s.enable_profiling = req.enable_profiling
+    if req.profile_sample_pct is not None:
+        s.profile_sample_pct = req.profile_sample_pct
+    if req.extra_params is not None:
+        s.extra_params = req.extra_params
     log.info("source_updated", source_id=source_id)
     return {"source_id": source_id, "status": "updated"}
 

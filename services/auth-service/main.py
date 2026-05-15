@@ -33,7 +33,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from starlette.requests import Request
@@ -310,7 +310,6 @@ async def get_current_user(
     client_ip = request.client.host if request.client else None
     payload = decode_and_validate_token(credentials.credentials, client_ip)
 
-    user_id = payload.get("sub")
     email = payload.get("email", "")
     if email not in _users_db or not _users_db[email].is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User inactive or not found")

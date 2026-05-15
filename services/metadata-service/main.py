@@ -19,7 +19,7 @@ from typing import Any
 
 import httpx
 import structlog
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from kafka import KafkaConsumer, KafkaProducer
 from pydantic import BaseModel, Field
