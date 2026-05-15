@@ -16,7 +16,6 @@ import asyncio
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Annotated
 
 import httpx
 import structlog

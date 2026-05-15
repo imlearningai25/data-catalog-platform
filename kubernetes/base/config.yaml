@@ -12,7 +12,7 @@ data:
   kafka_topic_raw_metadata: "raw-metadata-events"
   kafka_topic_enriched_metadata: "enriched-metadata-events"
   redis_url: "redis://redis-master.data-catalog.svc.cluster.local:6379"
-  gcp_project: "my-data-platform"
+  gcp_project: "my-data-platform-496418"
   bq_dataset: "data_catalog"
   auth_service_url: "http://auth-service.data-catalog.svc.cluster.local:8006"
   catalog_service_url: "http://catalog-service.data-catalog.svc.cluster.local:8005"
@@ -47,7 +47,7 @@ metadata:
   name: data-catalog-sa
   namespace: data-catalog
   annotations:
-    iam.gke.io/gcp-service-account: data-catalog-k8s@my-data-platform.iam.gserviceaccount.com
+    iam.gke.io/gcp-service-account: data-catalog-k8s@my-data-platform-496418.iam.gserviceaccount.com
 ---
 # ============================================================
 # PodDisruptionBudget — ensure 99.99% uptime during disruptions

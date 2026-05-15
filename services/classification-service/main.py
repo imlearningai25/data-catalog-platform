@@ -11,7 +11,6 @@ Provides PII detection and data sensitivity classification using:
 from __future__ import annotations
 
 import re
-import hashlib
 from enum import Enum
 from typing import Any
 

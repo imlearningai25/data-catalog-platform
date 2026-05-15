@@ -40,7 +40,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: connector-service
-          image: us-central1-docker.pkg.dev/my-data-platform/data-catalog/connector-service:1.0.0
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/connector-service:1.0.0
           imagePullPolicy: Always
           ports:
             - name: http

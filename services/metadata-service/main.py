@@ -15,7 +15,6 @@ import json
 import re
 import time
 from contextlib import asynccontextmanager
-from enum import Enum
 from typing import Any
 
 import httpx

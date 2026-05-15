@@ -11,8 +11,6 @@ import asyncio
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any
-
 import httpx
 import structlog
 from fastapi import FastAPI, HTTPException, Query

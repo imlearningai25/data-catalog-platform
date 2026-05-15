@@ -47,7 +47,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: {{ svc.name }}
-          image: us-central1-docker.pkg.dev/my-data-platform/data-catalog/{{ svc.name }}:1.0.0
+          image: us-central1-docker.pkg.dev/my-data-platform-496418/data-catalog/{{ svc.name }}:1.0.0
           imagePullPolicy: Always
           ports:
             - containerPort: {{ svc.port }}

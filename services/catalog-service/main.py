@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import structlog
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import bigquery
 from kafka import KafkaConsumer

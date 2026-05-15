@@ -7,13 +7,10 @@ All writes are append-only — no updates or deletes.
 
 from __future__ import annotations
 
-import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
-
 import structlog
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
