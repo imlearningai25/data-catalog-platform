@@ -305,7 +305,7 @@ jobs:
 
             - name: Deploy with zero-downtime rolling update
               run: |
-                  kubectl apply -k kubernetes/base/ --namespace=${{ env.NAMESPACE }}
+                  kubectl apply -f kubernetes/base/ --namespace=${{ env.NAMESPACE }}
                   kubectl apply -f kubernetes/services/ --namespace=${{ env.NAMESPACE }}
                   kubectl apply -f kubernetes/security/ --namespace=${{ env.NAMESPACE }}
                   kubectl apply -f monitoring/kubernetes/monitoring-stack.yaml
