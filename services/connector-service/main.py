@@ -28,7 +28,7 @@ from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTEN
 from starlette.responses import Response
 
 from connectors.base import (
-    ConnectionConfig, ConnectorResult, DataSourceType, RawMetadataEvent,
+    ConnectionConfig, DataSourceType, RawMetadataEvent,
 )
 from connectors.teradata import TeradataConnector
 from connectors.mssql import MSSQLConnector

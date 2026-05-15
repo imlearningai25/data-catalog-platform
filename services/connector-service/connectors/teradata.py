@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
-from functools import partial
-from typing import Any
 
 import structlog
 
@@ -260,7 +258,6 @@ class TeradataConnector(BaseConnector):
         try:
             rows = await self._execute_query(query)
             if rows:
-                row = rows[0]
                 # Parse the flat row back into column profiles
                 # (simplified: in production use cursor.description for col mapping)
                 pass

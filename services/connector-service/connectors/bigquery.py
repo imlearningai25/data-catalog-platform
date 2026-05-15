@@ -6,12 +6,9 @@ partition/cluster metadata.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-
 import structlog
 from google.cloud import bigquery
-from google.cloud.bigquery import Client, Dataset, Table
+from google.cloud.bigquery import Client, Table
 
 from .base import BaseConnector, ColumnProfile, ConnectionConfig, TableProfile
 

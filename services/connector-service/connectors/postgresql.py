@@ -36,8 +36,6 @@ from connectors.base import (
     BaseConnector,
     ColumnProfile,
     ConnectionConfig,
-    DataSourceType,
-    SchemaProfile,
     TableProfile,
 )
 

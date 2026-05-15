@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
-from typing import Any
 
 import structlog
 
@@ -17,8 +16,6 @@ from connectors.base import (
     BaseConnector,
     ColumnProfile,
     ConnectionConfig,
-    DataSourceType,
-    SchemaProfile,
     TableProfile,
 )
 
@@ -145,7 +142,6 @@ class SQLiteConnector(BaseConnector):
             samples = [str(r[0]) for r in sample_rows if r[0] is not None]
 
             # Null / distinct count via COUNT
-            total_count    = self._conn.execute(f"SELECT COUNT(*) FROM \"{raw_name}\"").fetchone()[0]
             null_count     = self._conn.execute(
                 f"SELECT COUNT(*) FROM \"{raw_name}\" WHERE \"{col_name}\" IS NULL"
             ).fetchone()[0]

@@ -151,9 +151,6 @@ class BaseConnector(abc.ABC):
           3. Profile each table
         Returns a list of SchemaProfile objects.
         """
-        import time
-        start = time.monotonic()
-
         results: list[SchemaProfile] = []
         schemas = await self.discover_schemas()
 
