@@ -18,6 +18,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { GitBranch, Database, ChevronDown, ArrowUpRight, ArrowDownRight, Layers, ExternalLink } from 'lucide-react';
 import { lineageApi, catalogApi } from '../services/api';
+import { LineageEdge } from '../types';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -290,8 +291,8 @@ export default function LineageGraph() {
   useEffect(() => { setNodes(builtNodes); }, [builtNodes]);
   useEffect(() => { setEdges(builtEdges); }, [builtEdges]);
 
-  const upstreamCount   = activeEdges.filter(e => e.target_fqn === selectedFqn).length;
-  const downstreamCount = activeEdges.filter(e => e.source_fqn === selectedFqn).length;
+  const upstreamCount   = activeEdges.filter((e: LineageEdge) => e.target_fqn === selectedFqn).length;
+  const downstreamCount = activeEdges.filter((e: LineageEdge) => e.source_fqn === selectedFqn).length;
 
   const assets = catalogData?.assets ?? [];
 

@@ -620,8 +620,8 @@ function EditPanel({ source, onClose }: { source: any; onClose: () => void }) {
         host, port, database, username,
         ...(password ? { password } : {}),  // omit if blank → keep existing
         extra_params,
-        schema_filter: schemaFilter ? schemaFilter.split(',').map(s => s.trim()) : [],
-        table_filter:  tableFilter  ? tableFilter.split(',').map(s => s.trim())  : [],
+        schema_filter: schemaFilter ? schemaFilter.split(',').map((s: string) => s.trim()) : [],
+        table_filter:  tableFilter  ? tableFilter.split(',').map((s: string) => s.trim())  : [],
         enable_profiling: enableProfiling,
         profile_sample_pct: profilePct,
       });
