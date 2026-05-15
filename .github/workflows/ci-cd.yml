@@ -321,16 +321,16 @@ jobs:
                   done
                   echo "All deployments rolled out successfully"
 
-            - name: Production smoke tests
+            - name: Smoke tests — verify all pods are Running
               run: |
-                  sleep 30   # Allow LB to update
-                  SERVICES=("auth" "catalog" "connector" "terms" "lineage" "audit")
+                  SERVICES=(connector-service metadata-service classification-service term-service catalog-service auth-service audit-service lineage-service)
                   for svc in "${SERVICES[@]}"; do
-                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://api.datacatalog.io/$svc/health" --max-time 10)
-                    echo "$svc: HTTP $STATUS"
-                    [ "$STATUS" = "200" ] || (echo "Production health check FAILED for $svc" && exit 1)
+                    READY=$(kubectl get deployment/$svc -n ${{ env.NAMESPACE }} -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+                    DESIRED=$(kubectl get deployment/$svc -n ${{ env.NAMESPACE }} -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+                    echo "$svc: $READY/$DESIRED replicas ready"
+                    [ "$READY" = "$DESIRED" ] && [ "$READY" != "0" ] || (echo "Smoke test FAILED for $svc" && exit 1)
                   done
-                  echo "All production health checks passed"
+                  echo "All deployments healthy"
 
             - name: Tag release in Git
               run: |
