@@ -749,8 +749,8 @@ curl -X POST http://localhost:8006/auth/login \
 
 # Expected response (save the access_token!):
 # {
-#   "access_token": "eyJhbGciOiJIUzI1NiIsInR...",
-#   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR...",
+#   "access_token": "<YOUR_ACCESS_TOKEN>",
+#   "refresh_token": "<YOUR_REFRESH_TOKEN>",
 #   "token_type": "bearer",
 #   "expires_in": 900,
 #   "role": "admin"

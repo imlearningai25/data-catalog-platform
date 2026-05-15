@@ -1,0 +1,9 @@
+title = "Data Catalog Platform — Gitleaks Config"
+
+[allowlist]
+  description = "Ignore known false positives in dev tool configs and documentation"
+  paths = [
+    '''.claude/settings.json''',
+    '''SETUP_GUIDE.md''',
+    '''docker-compose.yml''',
+  ]
