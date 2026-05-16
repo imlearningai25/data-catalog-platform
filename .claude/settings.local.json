@@ -19,6 +19,9 @@
       "Bash(python -c \"import subprocess; r=subprocess.run\\(['python', 'poc/seed_postgres.py'], capture_output=True, text=True, encoding='utf-8'\\); print\\(r.stdout[-500:] if r.stdout else 'no stdout'\\); print\\('ERR:', r.stderr[-300:] if r.stderr else 'none'\\)\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Total:', d.get\\('total'\\)\\); [print\\(a['fqn'], '| quality:', a.get\\('quality_score'\\), a.get\\('quality_grade'\\), '| completeness:', a.get\\('quality_completeness'\\)\\) for a in d.get\\('assets', []\\)]\")",
       "Bash(python -c ' *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\newro\\.claude\\projects\\c--Users-newro-Documents-codes-claude-DevSecOps-data-catalog-platform\\memory"
     ]
   }
 }

@@ -24,6 +24,25 @@ spec:
         - protocol: UDP
           port: 53    # DNS
 ---
+# Allow GCE Load Balancer and health check traffic into api-gateway and frontend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gce-loadbalancer
+  namespace: data-catalog
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: data-catalog
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 130.211.0.0/22   # Google Load Balancer
+        - ipBlock:
+            cidr: 35.191.0.0/16    # Google health checks
+---
 # Allow inter-service traffic via explicit service labels
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
