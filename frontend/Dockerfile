@@ -2,7 +2,7 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
-ARG VITE_API_GATEWAY_URL=http://localhost:8000
+ARG VITE_API_GATEWAY_URL=http://localhost:4456
 ENV VITE_API_GATEWAY_URL=$VITE_API_GATEWAY_URL
 
 COPY package.json .

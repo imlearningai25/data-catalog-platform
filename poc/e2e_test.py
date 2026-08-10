@@ -32,13 +32,13 @@ except ImportError:
     sys.exit(1)
 
 # ── Config ────────────────────────────────────────────────────
-BASE_URL      = "http://localhost:8000"   # API gateway
+BASE_URL      = "http://localhost:4456"   # API gateway
 AUTH_URL      = f"{BASE_URL}/auth"
 CATALOG_URL   = f"{BASE_URL}/catalog"
 CONNECTOR_URL = f"{BASE_URL}/connector"
 AUDIT_URL     = f"{BASE_URL}/audit"
 LINEAGE_URL   = f"{BASE_URL}/lineage"
-PROMETHEUS    = "http://localhost:9090"
+PROMETHEUS    = "http://localhost:4458"
 
 ADMIN_EMAIL    = "admin@datacatalog.io"
 ADMIN_PASSWORD = "Admin@SecureP@ss1"
@@ -84,15 +84,15 @@ def warn(msg: str):
 # ══════════════════════════════════════════════════════════════
 
 HEALTH_ENDPOINTS = {
-    "api-gateway":         f"http://localhost:8000/health",
-    "auth-service":        f"http://localhost:8006/health",
-    "connector-service":   f"http://localhost:8001/health",
-    "metadata-service":    f"http://localhost:8002/health",
-    "classification-svc":  f"http://localhost:8003/health",
-    "term-service":        f"http://localhost:8004/health",
-    "catalog-service":     f"http://localhost:8005/health",
-    "audit-service":       f"http://localhost:8007/health",
-    "lineage-service":     f"http://localhost:8008/health",
+    "api-gateway":         f"http://localhost:4456/health",
+    "auth-service":        f"http://localhost:4453/health",
+    "connector-service":   f"http://localhost:4448/health",
+    "metadata-service":    f"http://localhost:4449/health",
+    "classification-svc":  f"http://localhost:4450/health",
+    "term-service":        f"http://localhost:4451/health",
+    "catalog-service":     f"http://localhost:4452/health",
+    "audit-service":       f"http://localhost:4454/health",
+    "lineage-service":     f"http://localhost:4455/health",
 }
 
 
@@ -349,7 +349,7 @@ def check_metrics():
         else:
             warn(f"Prometheus returned HTTP {resp.status_code}")
     except Exception:
-        warn("Prometheus not reachable on localhost:9090 — skipping metrics check")
+        warn("Prometheus not reachable on localhost:4458 — skipping metrics check")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -388,10 +388,10 @@ def print_summary(assets: list[dict]):
 
     print()
     print(f"  {B('Useful URLs:')}")
-    print(f"     Grafana        http://localhost:3001   admin / admin123")
-    print(f"     Prometheus     http://localhost:9090")
-    print(f"     OPA            http://localhost:8181")
-    print(f"     API Gateway    http://localhost:8000/health")
+    print(f"     Grafana        http://localhost:4459   admin / admin123")
+    print(f"     Prometheus     http://localhost:4458")
+    print(f"     OPA            http://localhost:4447")
+    print(f"     API Gateway    http://localhost:4456/health")
 
     print()
     print(B(HR("═")))

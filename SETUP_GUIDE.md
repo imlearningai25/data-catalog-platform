@@ -702,22 +702,22 @@ You should see every service showing **"Up"** or **"healthy"**:
 ```
 NAME                   STATUS          PORTS
 zookeeper              Up (healthy)    2181/tcp
-kafka                  Up (healthy)    0.0.0.0:9093->9093/tcp
-redis                  Up (healthy)    0.0.0.0:6379->6379/tcp
-opa                    Up (healthy)    0.0.0.0:8181->8181/tcp
-connector-service      Up (healthy)    0.0.0.0:8001->8001/tcp
-metadata-service       Up (healthy)    0.0.0.0:8002->8002/tcp
-classification-service Up (healthy)    0.0.0.0:8003->8003/tcp
-term-service           Up (healthy)    0.0.0.0:8004->8004/tcp
-catalog-service        Up (healthy)    0.0.0.0:8005->8005/tcp
-auth-service           Up (healthy)    0.0.0.0:8006->8006/tcp
-audit-service          Up (healthy)    0.0.0.0:8007->8007/tcp
-lineage-service        Up (healthy)    0.0.0.0:8008->8008/tcp
-api-gateway            Up (healthy)    0.0.0.0:8000->8000/tcp
-frontend               Up              0.0.0.0:8009->8009/tcp
-prometheus             Up (healthy)    0.0.0.0:9090->9090/tcp
-grafana                Up (healthy)    0.0.0.0:8010->3000/tcp
-alertmanager           Up              0.0.0.0:9093->9093/tcp
+kafka                  Up (healthy)    0.0.0.0:4444->9092/tcp, 0.0.0.0:4445->9094/tcp
+redis                  Up (healthy)    0.0.0.0:4446->6379/tcp
+opa                    Up (healthy)    0.0.0.0:4447->8181/tcp
+connector-service      Up (healthy)    0.0.0.0:4448->8001/tcp
+metadata-service       Up (healthy)    0.0.0.0:4449->8002/tcp
+classification-service Up (healthy)    0.0.0.0:4450->8003/tcp
+term-service           Up (healthy)    0.0.0.0:4451->8004/tcp
+catalog-service        Up (healthy)    0.0.0.0:4452->8005/tcp
+auth-service           Up (healthy)    0.0.0.0:4453->8006/tcp
+audit-service          Up (healthy)    0.0.0.0:4454->8007/tcp
+lineage-service        Up (healthy)    0.0.0.0:4455->8008/tcp
+api-gateway            Up (healthy)    0.0.0.0:4456->8000/tcp
+frontend               Up              0.0.0.0:4457->8009/tcp
+prometheus             Up (healthy)    0.0.0.0:4458->9090/tcp
+grafana                Up (healthy)    0.0.0.0:4459->3000/tcp
+alertmanager           Up              0.0.0.0:4460->9093/tcp
 ```
 
 ---
@@ -729,21 +729,21 @@ Run through these checks one by one after startup:
 ### 1. API Gateway health check
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:4456/health
 # Expected: {"status":"healthy","service":"api-gateway"}
 ```
 
 ### 2. Auth service health check
 
 ```bash
-curl http://localhost:8006/health
+curl http://localhost:4453/health
 # Expected: {"status":"healthy","service":"auth-service"}
 ```
 
 ### 3. Log in and get a JWT token
 
 ```bash
-curl -X POST http://localhost:8006/auth/login \
+curl -X POST http://localhost:4453/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@datacatalog.io","password":"Admin@SecureP@ss1"}'
 
@@ -760,7 +760,7 @@ curl -X POST http://localhost:8006/auth/login \
 Save the `access_token` — you'll need it for the next steps:
 ```bash
 # Store the token (Mac/Linux)
-TOKEN=$(curl -s -X POST http://localhost:8006/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:4453/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@datacatalog.io","password":"Admin@SecureP@ss1"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
@@ -771,7 +771,7 @@ echo "Token saved: ${TOKEN:0:30}..."
 ### 4. Test RBAC — check your permissions
 
 ```bash
-curl -X POST "http://localhost:8006/authz/check?resource=asset&action=read" \
+curl -X POST "http://localhost:4453/authz/check?resource=asset&action=read" \
   -H "Authorization: Bearer $TOKEN"
 # Expected: {"allowed":true,"role":"admin","resource":"asset","action":"read"}
 ```
@@ -779,7 +779,7 @@ curl -X POST "http://localhost:8006/authz/check?resource=asset&action=read" \
 ### 5. Register a test data source
 
 ```bash
-curl -X POST http://localhost:8001/sources \
+curl -X POST http://localhost:4448/sources \
   -H "Content-Type: application/json" \
   -d '{
     "source_type": "mssql",
@@ -798,7 +798,7 @@ curl -X POST http://localhost:8001/sources \
 ### 6. Test the classification service
 
 ```bash
-curl -X POST http://localhost:8003/classify/column \
+curl -X POST http://localhost:4450/classify/column \
   -H "Content-Type: application/json" \
   -d '{
     "column_name": "customer_email",
@@ -819,7 +819,7 @@ curl -X POST http://localhost:8003/classify/column \
 ### 7. Test term suggestion
 
 ```bash
-curl -X POST http://localhost:8004/terms/suggest \
+curl -X POST http://localhost:4451/terms/suggest \
   -H "Content-Type: application/json" \
   -d '{
     "column_name": "customer_id",
@@ -832,7 +832,7 @@ curl -X POST http://localhost:8004/terms/suggest \
 
 ### 8. Open the React frontend
 
-Open your browser and go to: **http://localhost:8009**
+Open your browser and go to: **http://localhost:4457**
 
 Log in with:
 - Email: `admin@datacatalog.io`
@@ -840,14 +840,14 @@ Log in with:
 
 ### 9. Open Prometheus
 
-**http://localhost:9090**
+**http://localhost:4458**
 
 In the search box, type: `up` and press Enter.
 You should see all your services listed with value `1` (meaning they are up).
 
 ### 10. Open Grafana
 
-**http://localhost:8010**
+**http://localhost:4459**
 
 - Username: `admin`
 - Password: `admin123`
@@ -1051,7 +1051,7 @@ kubectl get ingress -n data-catalog
 
 ```bash
 # Local Docker Compose:
-open http://localhost:9090
+open http://localhost:4458
 
 # Kubernetes (port-forward):
 kubectl port-forward svc/prometheus 9090:9090 -n monitoring
@@ -1076,7 +1076,7 @@ rate(auth_attempts_total{outcome="wrong_password"}[5m])
 
 ```bash
 # Local Docker Compose:
-open http://localhost:8010
+open http://localhost:4459
 # Username: admin  Password: admin123
 ```
 
@@ -1109,12 +1109,12 @@ The **Data Catalog Platform SLA Dashboard** is pre-provisioned. It shows:
 ### Problem: `docker compose up` fails with "port already in use"
 
 ```bash
-# Find what is using the port (example: port 8006)
+# Find what is using the port (example: port 4453)
 # Windows:
-netstat -ano | findstr :8006
+netstat -ano | findstr :4453
 
 # Mac/Linux:
-lsof -i :8006
+lsof -i :4453
 
 # Kill the process (replace PID with the number shown)
 # Windows:
@@ -1164,7 +1164,7 @@ gcloud projects get-iam-policy my-data-platform \
 
 ```bash
 # Check API Gateway is running
-curl http://localhost:8000/health
+curl http://localhost:4456/health
 
 # Check frontend environment variable
 docker compose exec frontend env | grep VITE
@@ -1203,22 +1203,22 @@ docker compose down -v --rmi all
 
 | Service | Local URL | Purpose |
 |---|---|---|
-| **React Frontend** | http://localhost:8009 | Main web interface |
-| **API Gateway** | http://localhost:8000 | All API calls go through here |
-| **Connector Service** | http://localhost:8001/docs | Source connections (Swagger UI) |
-| **Metadata Service** | http://localhost:8002/docs | Metadata enrichment (Swagger UI) |
-| **Classification Service** | http://localhost:8003/docs | PII detection (Swagger UI) |
-| **Term Service** | http://localhost:8004/docs | Business glossary (Swagger UI) |
-| **Catalog Service** | http://localhost:8005/docs | Main catalog (Swagger UI) |
-| **Auth Service** | http://localhost:8006/docs | Login / RBAC (Swagger UI) |
-| **Audit Service** | http://localhost:8007/docs | Audit log (Swagger UI) |
-| **Lineage Service** | http://localhost:8008/docs | DataHub lineage (Swagger UI) |
-| **Prometheus** | http://localhost:9090 | Metrics & alerting |
-| **Grafana** | http://localhost:8010 | Dashboards (admin/admin123) |
-| **Alertmanager** | http://localhost:9093 | Alert routing |
-| **OPA** | http://localhost:8181 | Policy engine |
-| **Kafka** | localhost:9093 | Message broker (external) |
-| **Redis** | localhost:6379 | Cache |
+| **React Frontend** | http://localhost:4457 | Main web interface |
+| **API Gateway** | http://localhost:4456 | All API calls go through here |
+| **Connector Service** | http://localhost:4448/docs | Source connections (Swagger UI) |
+| **Metadata Service** | http://localhost:4449/docs | Metadata enrichment (Swagger UI) |
+| **Classification Service** | http://localhost:4450/docs | PII detection (Swagger UI) |
+| **Term Service** | http://localhost:4451/docs | Business glossary (Swagger UI) |
+| **Catalog Service** | http://localhost:4452/docs | Main catalog (Swagger UI) |
+| **Auth Service** | http://localhost:4453/docs | Login / RBAC (Swagger UI) |
+| **Audit Service** | http://localhost:4454/docs | Audit log (Swagger UI) |
+| **Lineage Service** | http://localhost:4455/docs | DataHub lineage (Swagger UI) |
+| **Prometheus** | http://localhost:4458 | Metrics & alerting |
+| **Grafana** | http://localhost:4459 | Dashboards (admin/admin123) |
+| **Alertmanager** | http://localhost:4460 | Alert routing |
+| **OPA** | http://localhost:4447 | Policy engine |
+| **Kafka** | localhost:4445 | Message broker (external) |
+| **Redis** | localhost:4446 | Cache |
 | **DataHub UI** | http://localhost:9002 | Lineage graph UI |
 | **DataHub GMS** | http://localhost:8080 | Lineage REST API |
 
@@ -1235,8 +1235,8 @@ docker compose down -v --rmi all
 
 Every FastAPI service has automatic interactive documentation.
 Go to any service URL + `/docs`, for example:
-- **http://localhost:8006/docs** — Auth service API explorer
-- **http://localhost:8003/docs** — Classification service API explorer
+- **http://localhost:4453/docs** — Auth service API explorer
+- **http://localhost:4450/docs** — Classification service API explorer
 
 You can test API calls directly from the browser — no code needed.
 

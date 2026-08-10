@@ -3,23 +3,24 @@
 # Starts all microservices + infrastructure in one command:
 #   docker-compose up -d
 #
-# Service ports:
-#   8000  API Gateway
-#   8001  Connector Service
-#   8002  Metadata Service
-#   8003  Classification Service
-#   8004  Term Service
-#   8005  Catalog Service
-#   8006  Auth Service
-#   8007  Audit Service
-#   8008  Lineage Service
-#   8009  React Frontend (Vite dev server)
-#   9090  Prometheus
-#   8010  Grafana
-#   9093  Alertmanager
-#   8181  OPA
-#   9092  Kafka (internal), 9094 Kafka (external listener)
-#   6379  Redis
+# Service ports (external, host-mapped — all start at 4444):
+#   4444  Kafka (internal listener, host-mapped)
+#   4445  Kafka (external listener)
+#   4446  Redis
+#   4447  OPA
+#   4448  Connector Service
+#   4449  Metadata Service
+#   4450  Classification Service
+#   4451  Term Service
+#   4452  Catalog Service
+#   4453  Auth Service
+#   4454  Audit Service
+#   4455  Lineage Service
+#   4456  API Gateway
+#   4457  React Frontend (Vite dev server)
+#   4458  Prometheus
+#   4459  Grafana
+#   4460  Alertmanager
 #   8080  DataHub GMS
 # ============================================================
 
@@ -107,12 +108,12 @@ services:
       zookeeper:
         condition: service_healthy
     ports:
-      - "9092:9092"
-      - "9094:9094"
+      - "4444:9092"
+      - "4445:9094"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:4445
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -150,7 +151,7 @@ services:
     image: redis:7.2-alpine
     container_name: redis
     ports:
-      - "6379:6379"
+      - "4446:6379"
     command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --appendonly yes
     volumes:
       - redis-data:/data
@@ -165,7 +166,7 @@ services:
     image: openpolicyagent/opa:0.65.0-debug
     container_name: opa
     ports:
-      - "8181:8181"
+      - "4447:8181"
     command:
       - "run"
       - "--server"
@@ -190,7 +191,7 @@ services:
       dockerfile: Dockerfile
     container_name: connector-service
     ports:
-      - "8001:8001"
+      - "4448:8001"
     command: uvicorn main:app --host 0.0.0.0 --port 8001 --workers 2 --log-level info
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -205,7 +206,7 @@ services:
       dockerfile: Dockerfile
     container_name: metadata-service
     ports:
-      - "8002:8002"
+      - "4449:8002"
     command: uvicorn main:app --host 0.0.0.0 --port 8002 --workers 2
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
@@ -220,7 +221,7 @@ services:
       dockerfile: Dockerfile
     container_name: classification-service
     ports:
-      - "8003:8003"
+      - "4450:8003"
     command: uvicorn main:app --host 0.0.0.0 --port 8003 --workers 4
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
@@ -235,7 +236,7 @@ services:
       dockerfile: Dockerfile
     container_name: term-service
     ports:
-      - "8004:8004"
+      - "4451:8004"
     command: uvicorn main:app --host 0.0.0.0 --port 8004 --workers 2
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
@@ -250,7 +251,7 @@ services:
       dockerfile: Dockerfile
     container_name: catalog-service
     ports:
-      - "8005:8005"
+      - "4452:8005"
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - REDIS_URL=redis://redis:6379
@@ -276,7 +277,7 @@ services:
       dockerfile: Dockerfile
     container_name: auth-service
     ports:
-      - "8006:8006"
+      - "4453:8006"
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - REDIS_URL=redis://redis:6379
@@ -304,7 +305,7 @@ services:
       dockerfile: Dockerfile
     container_name: audit-service
     ports:
-      - "8007:8007"
+      - "4454:8007"
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - REDIS_URL=redis://redis:6379
@@ -329,7 +330,7 @@ services:
       dockerfile: Dockerfile
     container_name: lineage-service
     ports:
-      - "8008:8008"
+      - "4455:8008"
     command: uvicorn main:app --host 0.0.0.0 --port 8008 --workers 2
     environment:
       - DATAHUB_ENABLED=false
@@ -347,7 +348,7 @@ services:
     image: nginx:1.27-alpine
     container_name: api-gateway
     ports:
-      - "8000:8000"
+      - "4456:8000"
     volumes:
       - ./services/api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./services/api-gateway/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
@@ -375,9 +376,9 @@ services:
       dockerfile: Dockerfile.dev
     container_name: frontend
     ports:
-      - "8009:8009"
+      - "4457:8009"
     environment:
-      - VITE_API_GATEWAY_URL=http://localhost:8000
+      - VITE_API_GATEWAY_URL=http://localhost:4456
     volumes:
       - ./frontend/src:/app/src:ro
     depends_on:
@@ -390,7 +391,7 @@ services:
     image: prom/prometheus:v2.51.0
     container_name: prometheus
     ports:
-      - "9090:9090"
+      - "4458:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -411,7 +412,7 @@ services:
     image: grafana/grafana:10.4.2
     container_name: grafana
     ports:
-      - "8010:3000"
+      - "4459:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin123
@@ -435,7 +436,7 @@ services:
     image: prom/alertmanager:v0.27.0
     container_name: alertmanager
     ports:
-      - "9093:9093"
+      - "4460:9093"
     volumes:
       - ./monitoring/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
